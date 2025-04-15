@@ -40,3 +40,13 @@ hs_err_pid*
 
 ### Temporary files ###
 tmp/
+
+# Metals
+.metals/
+.bloop/
+.bsp/
+
+# VSCode
+.vscode/
+*.code-workspace
+

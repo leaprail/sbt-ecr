@@ -2,27 +2,29 @@
 
 An [SBT](http://www.scala-sbt.org/) plugin for managing [Docker](http://docker.io) images within [Amazon ECR](https://aws.amazon.com/ecr/).
 
-[ ![Download](https://api.bintray.com/packages/sbilinski/sbt-plugins/sbt-ecr/images/download.svg) ](https://bintray.com/sbilinski/sbt-plugins/sbt-ecr/_latestVersion)
+> **Note**: This is a fork of the original [sbt-ecr](https://github.com/sjednac/sbt-ecr) project, now maintained by [Leaprail](https://github.com/leaprail). This fork has been migrated to use AWS SDK v2.0 and includes additional features and improvements.
 
 ## Features
 
 * Create ECR repositories using `ecr:createRepository`
 * Login to the remote registry using `ecr:login`
 * Push local images using `ecr:push`
+* Built-in support for AWS IAM Identity Center (SSO) authentication
+* Uses AWS SDK v2 for all AWS interactions
 
 ## Installation
 
 Add the following to your `project/plugins.sbt` file:
 
-    addSbtPlugin("com.mintbeans" % "sbt-ecr" % "0.16.0")
+    addSbtPlugin("com.leaprail" % "sbt-ecr" % "1.0.0")
 
 Add ECR settings to your `build.sbt`. The following snippet assumes a Docker image build using [sbt-native-packager](https://github.com/sbt/sbt-native-packager):
 
-    import com.amazonaws.regions.{Region, Regions}
+    import software.amazon.awssdk.regions.Region
     
     enablePlugins(EcrPlugin)
 
-    region           in Ecr := Region.getRegion(Regions.US_EAST_1)
+    region           in Ecr := Region.US_EAST_1
     repositoryName   in Ecr := (packageName in Docker).value
     localDockerImage in Ecr := (packageName in Docker).value + ":" + (version in Docker).value
 
@@ -38,17 +40,44 @@ That being said, it's a convenient feature, when you don't rely on any tool like
 
 ## Usage
 
-The plugin [follows](https://github.com/sbilinski/sbt-ecr/blob/master/src/main/scala/sbtecr/Aws.scala) common security
-conventions. That is, you can use the following **authentication** methods:
+The plugin now supports the latest AWS authentication methods, following the [AWS SDK credential provider chain](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials-chain.html):
 
-* provide `AWS_ACCESS_KEY_ID` and `AWS_SECRET_KEY` as [environment variables](https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EnvironmentVariableCredentialsProvider.html).
-* provide `aws.accessKeyId` and `aws.secretKey` as [system properties](https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/SystemPropertiesCredentialsProvider.html).
-* use a [profile](https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/profile/ProfileCredentialsProvider.html) specified by the `AWS_DEFAULT_PROFILE` environment variable.
-* use the [EC2 instance profile](https://docs.aws.amazon.com/AWSJavaSDK/latest/javadoc/com/amazonaws/auth/EC2ContainerCredentialsProviderWrapper.html) when the process is run directly in [Amazon EC2](https://aws.amazon.com/ec2/).
+* Provide `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` as [environment variables](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials-environment.html).
+* Use Java system properties: `aws.accessKeyId` and `aws.secretKey`.
+* Use an AWS profile configured in the AWS credentials or config file.
+* Use AWS IAM Identity Center (SSO) authentication.
+* Use Web Identity Token credentials (for EKS/Kubernetes).
+* Use the [EC2 instance profile](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html) when running on EC2.
+* Use ECS container credentials when running in ECS.
 
-To make it work **locally**, you may configure an AWS profile according to the [reference page](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html), and spawn the `push` process as such:
+### Local Development with AWS Profiles
 
-    AWS_DEFAULT_PROFILE=<your_profile_name> sbt ecr:push
+1. **Standard Profile**: Configure an AWS profile according to the [AWS CLI documentation](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html):
+
+   ```
+   AWS_PROFILE=your_profile_name sbt ecr:push
+   ```
+
+2. **IAM Identity Center (SSO) Authentication**:
+   
+   First, configure an SSO profile in your AWS config file:
+
+   ```
+   [profile my-sso-profile]
+   sso_start_url = https://my-sso-portal.awsapps.com/start
+   sso_region = us-east-1
+   sso_account_id = 123456789012
+   sso_role_name = SSOReadOnlyRole
+   region = us-west-2
+   output = json
+   ```
+
+   Then login with the AWS CLI before running sbt:
+
+   ```
+   aws sso login --profile my-sso-profile
+   AWS_PROFILE=my-sso-profile sbt ecr:push
+   ```
 
 ## Tagging
 

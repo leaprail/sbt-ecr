@@ -1,6 +1,6 @@
 package sbtecr
 
-import com.amazonaws.regions.Region
+import software.amazon.awssdk.regions.Region
 import sbt.Keys._
 import sbt._
 import sbtecr.Commands._
